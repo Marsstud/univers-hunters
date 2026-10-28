@@ -515,7 +515,7 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;bord
     </div>
     <form id="lead-form" novalidate>
       <label>Имя<input name="name" type="text" autocomplete="name" placeholder="Как к вам обращаться" required maxlength="80"></label>
-      <label>WhatsApp или телефон<input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 7__ ___ __ __" required maxlength="30"></label>
+      <label>WhatsApp или телефон<input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 707 000 00 00" required maxlength="30"></label>
       <label class="full">Instagram или сайт <span style="font-weight:400;color:var(--muted)">— необязательно</span><input name="link" type="text" placeholder="@вашбизнес" maxlength="120"></label>
       <label class="hp" aria-hidden="true">Компания<input name="company" type="text" tabindex="-1" autocomplete="off"></label>
       <input type="hidden" name="pack" value="">
@@ -549,6 +549,43 @@ if (FB_PIXEL_ID) {
 }
 function track(ev){ try { if (window.fbq) fbq('track', ev); } catch(e){} }
 document.querySelectorAll('[data-track]').forEach(function(a){ a.addEventListener('click', function(){ track(a.dataset.track); }); });
+
+/* Маска телефона: +7 707 349 83 33 */
+(function(){
+  var ph = document.querySelector('input[name="phone"]');
+  if (!ph) return;
+  var prevLocal = '', shifted = false;
+  function localDigits(v){
+    var full = v.replace(/\D/g, '');
+    if (/^\s*\+7/.test(v)) return full.slice(1);            // префикс +7 уже есть
+    if (full.length >= 11 && (full[0] === '7' || full[0] === '8')) return full.slice(1); // вставили номер целиком
+    if (full[0] === '8') return full.slice(1);               // начали с 8
+    return full;
+  }
+  function show(l){
+    l = l.slice(0, 10);
+    var r = '+7 ' + l.slice(0, 3);
+    if (l.length > 3) r += ' ' + l.slice(3, 6);
+    if (l.length > 6) r += ' ' + l.slice(6, 8);
+    if (l.length > 8) r += ' ' + l.slice(8, 10);
+    return r;
+  }
+  ph.addEventListener('focus', function(){ if (!ph.value) { ph.value = '+7 '; prevLocal = ''; } });
+  ph.addEventListener('blur', function(){ if (!localDigits(ph.value)) ph.value = ''; });
+  ph.addEventListener('input', function(e){
+    var l = localDigits(ph.value);
+    if (prevLocal === '' && l === '8') l = '';               // «8» в начале — код страны, а не цифра номера
+    if (e.inputType && e.inputType.indexOf('delete') === 0 && l === prevLocal) l = l.slice(0, -1); // стерли пробел
+    if (l.length > 10) {
+      // Набрали номер с кодом страны 7 — убираем лишнюю 7 (один раз), дальше лишние цифры не принимаем.
+      if (l[0] === '7' && !shifted) { l = l.slice(1); shifted = true; } else l = prevLocal;
+    }
+    if (l.length < 10) shifted = false;
+    l = l.slice(0, 10);
+    ph.value = show(l);
+    prevLocal = l;
+  });
+})();
 
 /* Кнопки «Выбрать» в пакетах подставляют пакет в заявку */
 var form = document.getElementById('lead-form');
