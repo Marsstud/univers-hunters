@@ -8,9 +8,16 @@ function clean(value, max) {
 }
 
 module.exports = async function handler(req, res) {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+
+  // GET /api/lead — проверка настройки (секреты не показываются).
+  if (req.method === 'GET') {
+    return res.status(200).json({ ok: true, token_set: Boolean(token), chat_id_set: Boolean(chatId) });
+  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ ok: false });
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ ok: false, error: 'method' });
   }
 
   let body = req.body;
@@ -28,8 +35,6 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'name_phone_required' });
   }
 
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
     console.error('TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не заданы');
     return res.status(500).json({ ok: false, error: 'not_configured' });
@@ -43,7 +48,6 @@ module.exports = async function handler(req, res) {
     'Телефон: ' + phone,
     'WhatsApp: https://wa.me/' + digits,
     'Instagram/сайт: ' + (clean(body.link, 120) || '—'),
-    'Что есть: ' + (clean(body.has, 60) || '—'),
     'Пакет: ' + (clean(body.pack, 60) || '—'),
     'Страница: ' + (clean(body.page, 200) || '—'),
   ];
@@ -55,12 +59,15 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({ chat_id: chatId, text: lines.join('\n'), disable_web_page_preview: true }),
     });
     if (!tg.ok) {
-      console.error('Telegram error', tg.status, await tg.text());
-      return res.status(502).json({ ok: false });
+      let desc = '';
+      try { desc = (await tg.json()).description || ''; } catch (e) {}
+      console.error('Telegram error', tg.status, desc);
+      // 401 — неверный токен, 400 «chat not found» — неверный chat id или боту не нажали Start.
+      return res.status(502).json({ ok: false, error: 'telegram_' + tg.status, detail: desc.slice(0, 120) });
     }
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error('Telegram request failed', e);
-    return res.status(502).json({ ok: false });
+    return res.status(502).json({ ok: false, error: 'telegram_unreachable' });
   }
 };

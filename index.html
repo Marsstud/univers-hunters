@@ -516,8 +516,7 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;bord
     <form id="lead-form" novalidate>
       <label>Имя<input name="name" type="text" autocomplete="name" placeholder="Как к вам обращаться" required maxlength="80"></label>
       <label>WhatsApp или телефон<input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 7__ ___ __ __" required maxlength="30"></label>
-      <label>Instagram или сайт<input name="link" type="text" placeholder="@вашбизнес" maxlength="120"></label>
-      <label>Что уже есть<select name="has"><option>Только Instagram</option><option>Есть сайт</option><option>Есть сайт и CRM</option><option>Пока ничего</option></select></label>
+      <label class="full">Instagram или сайт <span style="font-weight:400;color:var(--muted)">— необязательно</span><input name="link" type="text" placeholder="@вашбизнес" maxlength="120"></label>
       <label class="hp" aria-hidden="true">Компания<input name="company" type="text" tabindex="-1" autocomplete="off"></label>
       <input type="hidden" name="pack" value="">
       <button class="btn btn-accent full" type="submit">Хочу разбор</button>
@@ -565,20 +564,21 @@ form.addEventListener('submit', function(e){
   if (!name || phone.replace(/\D/g,'').length < 10) {
     msg.className = 'form-msg err'; msg.textContent = 'Укажите имя и номер телефона.'; return;
   }
-  var data = { name: name, phone: phone, link: el['link'].value.trim(), has: el['has'].value, pack: el['pack'].value, company: el['company'].value, page: location.href };
+  var data = { name: name, phone: phone, link: el['link'].value.trim(), pack: el['pack'].value, company: el['company'].value, page: location.href };
   btn.disabled = true; btn.textContent = 'Отправляем…';
   fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-    .then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ if (!r.ok || !j.ok) { var e = new Error(); e.code = (j && j.error) || ('http_' + r.status); throw e; } return j; }); })
     .then(function(){
       track('Lead');
       form.reset();
       msg.className = 'form-msg ok'; msg.textContent = 'Спасибо! Заявка получена — напишу вам в течение дня.';
       btn.textContent = 'Отправлено';
     })
-    .catch(function(){
+      .catch(function(err){
+      var code = (err && err.code) || 'network';
       var text = encodeURIComponent('Здравствуйте! Хочу бесплатный разбор. Меня зовут ' + name + ', мой номер ' + phone + (data.link ? ', ' + data.link : ''));
       msg.className = 'form-msg err';
-      msg.innerHTML = 'Не получилось отправить. <a href="https://wa.me/77073498333?text=' + text + '" target="_blank" rel="noopener">Отправьте заявку в WhatsApp одним нажатием</a>.';
+      msg.innerHTML = 'Не получилось отправить. <a href="https://wa.me/77073498333?text=' + text + '" target="_blank" rel="noopener">Отправьте заявку в WhatsApp одним нажатием</a>.<br><span style="font-size:12px;color:var(--muted)">Код ошибки: ' + code + '</span>';
       btn.disabled = false; btn.textContent = 'Хочу разбор';
     });
 });
